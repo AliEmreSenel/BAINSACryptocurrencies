@@ -2,6 +2,7 @@ from twitter_scraper_selenium import scrape_keyword, scrape_keyword_with_api
 from datetime import datetime, timedelta
 from os.path import isfile
 
+
 def save_tweets(since: datetime, until: datetime, per_day: int, hashtags: list, filename: str):
     for keyword in hashtags:
         print(f"Starting with {keyword}")
@@ -12,6 +13,7 @@ def save_tweets(since: datetime, until: datetime, per_day: int, hashtags: list, 
                 continue
             scrape_keyword(keyword=keyword, filename=name, since=str(since.date()),
                            until=str((since + timedelta(days=1)).date()), tweets_count=per_day)
+            since = since + timedelta(days=1)
 
 
 if __name__ == '__main__':
