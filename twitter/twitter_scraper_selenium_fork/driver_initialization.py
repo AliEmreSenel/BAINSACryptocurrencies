@@ -63,7 +63,7 @@ class Initializer:
 
     def set_driver_for_browser(self, browser_name: str):
         """expects browser name and returns a driver instance"""
-        # if browser is suppose to be chrome
+        # if browser is supposed to be chrome
         if browser_name.lower() == "chrome":
             browser_option = CustomChromeOptions()
             # automatically installs chromedriver and initialize it and returns the instance

@@ -23,10 +23,16 @@ logger.addHandler(ch)
 
 class Keyword:
     """This class needs to be instantiated in order to find something
-    on twitter related to keywords"""
+    on Twitter related to keywords"""
+    static_driver = None
+
+    @classmethod
+    def close_static_driver(cls):
+        cls.static_driver.close()
+        cls.static_driver.quit()
 
     def __init__(self, keyword: str, browser: str, proxy: Union[str, None], tweets_count: int, url: Union[str, None],
-                 headless: bool, browser_profile: Union[str, None]):
+                 headless: bool, browser_profile: Union[str, None], driver_to_close=True):
         """Scrape Tweet using keyword.
 
         Args:
@@ -40,7 +46,7 @@ class Keyword:
         """
         self.keyword = keyword
         self.URL = url
-        self.driver = ""
+        self.driver = None
         self.browser = browser
         self.proxy = proxy
         self.tweets_count = tweets_count
@@ -48,15 +54,21 @@ class Keyword:
         self.retry = 10
         self.headless = headless
         self.browser_profile = browser_profile
+        self.driver_to_close = driver_to_close
 
     def start_driver(self):
         """changes the class member driver value to driver on call"""
-        self.driver = Initializer(
-            self.browser, self.headless, self.proxy, self.browser_profile).init()
+        if Keyword.static_driver is None:
+            self.driver = Initializer(
+                self.browser, self.headless, self.proxy, self.browser_profile).init()
+            Keyword.static_driver = self.driver
+        else:
+            self.driver = Keyword.static_driver
 
     def close_driver(self):
         self.driver.close()
         self.driver.quit()
+        Keyword.static_driver = None
 
     def check_tweets_presence(self, tweet_list):
         if len(tweet_list) <= 0:
@@ -134,7 +146,8 @@ class Keyword:
             Utilities.wait_until_tweets_appear(self.driver)
             self.fetch_and_store_data()
 
-            self.close_driver()
+            if self.driver_to_close:
+                self.close_driver()
             data = dict(list(self.posts_data.items())
                         [0:int(self.tweets_count)])
             return data
@@ -194,7 +207,8 @@ def scrape_keyword(keyword: str, browser: str = "firefox", until: Union[str, Non
                    proxy: Union[str, None] = None, tweets_count: int = 10, output_format: str = "json",
                    filename: str = "", directory: str = os.getcwd(), headless: bool = True,
                    browser_profile: Union[str, None] = None,
-                   query_parameters: dict[str, Union[str, int]] = None):
+                   query_parameters: dict[str, Union[str, int]] = None,
+                   driver_to_close=True):
     """Scrap tweets using keywords.
 
     Args:
@@ -221,7 +235,8 @@ def scrape_keyword(keyword: str, browser: str = "firefox", until: Union[str, Non
                                            since_id=since_id, max_id=max_id, within_time=within_time,
                                            extra_parameters=query_parameters)
     keyword_bot = Keyword(keyword, browser=browser, url=URL,
-                          proxy=proxy, tweets_count=tweets_count, headless=headless, browser_profile=browser_profile)
+                          proxy=proxy, tweets_count=tweets_count, headless=headless, browser_profile=browser_profile,
+                          driver_to_close=driver_to_close)
     data = keyword_bot.scrap()
     if output_format.lower() == "json":
         if filename == '':
