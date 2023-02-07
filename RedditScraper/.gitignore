@@ -1,0 +1,10 @@
+Pipfile
+Pipfile.lock
+cache/
+comments.json
+main.py
+main_pmaw.py
+output2.txt
+posts.json
+reddit.db
+secrets.json
