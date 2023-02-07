@@ -27,10 +27,40 @@ def save_tweets(since: datetime, until: datetime, per_day: int, hashtags: list, 
     Keyword.close_static_driver()
 
 
+KEYWORDS = ["crypto", "dodgecoin", "btc", "ethereum", "bitcoin", "ripple", "solana"]
+
 if __name__ == '__main__':
+    import sys
+
+    args = sys.argv[1:]
+
+    d_s = int(args[0])
+    m_s = int(args[1])
+    y_s = int(args[2])
+    d_e = int(args[3])
+    m_e = int(args[4])
+    y_e = int(args[5])
+
+    start = datetime(y_s, m_s, d_s)
+    end = datetime(y_e, m_e, d_e)
+
+
+    print(f"Starting program from {start.date()} to {end.date()}")
+
     query_parameters = {
         "min_faves": 100,
     }
 
-    save_tweets(datetime(2022, 10, 1), datetime(2022, 10, 31), 20, ["crypto"], "scraped-tweets",
+    save_tweets(start, end, 20, KEYWORDS, "scraped-tweets",
                 query_parameters)
+
+# todo: oracle vps
+
+
+# instructions:
+# the function save tweets does the hard work, the algorithm is parallelized on the time frame, which means that
+# one should run different instances with different time windows. With little work we can change it to keywords, but it
+# is useless in my opinion as they are fixed.
+# The syntax is as follows: python3 main.py DAY_START MONTH_START YEAR_START DAY_END MONTH_END YEAR_END
+# Note that the range is (inclusive, exclusive)
+# The code is slightly verbose but most of the output is due to the webdriver, you can comment out parts
