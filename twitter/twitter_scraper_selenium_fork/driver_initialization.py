@@ -90,11 +90,10 @@ class Initializer:
                 }
                 logger.setLevel(logging.INFO)
                 logger.info("Using Proxy: {}".format(self.proxy))
-                return webdriver.Firefox(service=FirefoxService(executable_path=GeckoDriverManager().install()),
-                                         options=self.set_properties(browser_option), seleniumwire_options=options)
+                return webdriver.Firefox(service=FirefoxService(executable_path=GeckoDriverManager()), options=self.set_properties(browser_option), seleniumwire_options=options)
 
             # automatically installs geckodriver and initialize it and returns the instance
-            return webdriver.Firefox(service=FirefoxService(executable_path=GeckoDriverManager().install()), options=self.set_properties(browser_option))
+            return webdriver.Firefox(service=FirefoxService(executable_path="/snap/bin/geckodriver"), options=self.set_properties(browser_option))
         else:
             # if browser_name is not chrome neither firefox than raise an exception
             raise Exception("Browser not supported!")
