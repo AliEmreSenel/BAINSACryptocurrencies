@@ -55,6 +55,7 @@ def filter(item):
 
 
 queries = [
+    "crypto",
     "solana",
     "bitcoin",
     "etherium",

@@ -27,7 +27,19 @@ def save_tweets(since: datetime, until: datetime, per_day: int, hashtags: list, 
     Keyword.close_static_driver()
 
 
-KEYWORDS = ["crypto", "dodgecoin", "btc", "ethereum", "bitcoin", "ripple", "solana"]
+KEYWORDS = ["crypto",
+            "solana",
+            "bitcoin",
+            "etherium",
+            "ripple",
+            "dogecoin",
+            "apecoin",
+            "btc",
+            "eth",
+            "sol",
+            "xrp",
+            "doge",
+            "ape", ]
 
 if __name__ == '__main__':
     import sys
@@ -44,14 +56,13 @@ if __name__ == '__main__':
     start = datetime(y_s, m_s, d_s)
     end = datetime(y_e, m_e, d_e)
 
-
     print(f"Starting program from {start.date()} to {end.date()}")
 
     query_parameters = {
         "min_faves": 10,
     }
 
-    save_tweets(start, end, 20000, KEYWORDS, "scraped-tweets",
+    save_tweets(start, end, 200, KEYWORDS, "scraped-tweets",
                 query_parameters)
 
 # todo: oracle vps
