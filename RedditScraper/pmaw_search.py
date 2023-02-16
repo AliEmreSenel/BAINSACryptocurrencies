@@ -35,8 +35,8 @@ c.execute(
    is_reddit_media_domain integer,
    is_robot_indexable integer,
    is_gallery integer,
-   processed boolean,
-   comments_processed boolean
+   processed integer,
+   comments_processed integer
    )"""
 )
 
@@ -58,16 +58,16 @@ queries = [
     "crypto",
     "solana",
     "bitcoin",
-    "etherium",
-    "ripple",
-    "dogecoin",
-    "apecoin",
-    "btc",
-    "eth",
-    "sol",
-    "xrp",
-    "doge",
-    "ape",
+    # "etherium",
+    # "ripple",
+    # "dogecoin",
+    # "apecoin",
+    # "btc",
+    # "eth",
+    # "sol",
+    # "xrp",
+    # "doge",
+    # "ape",
 ]
 
 subreddits = []

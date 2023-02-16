@@ -1,7 +1,16 @@
+"""Reddit Post and Comment Data Scraper.
+
+Run pmaw_search.py first to get post ids
+Before running the script, make sure to get client id and secret from reddit and add to secrets.json using the following format:
+{"client_id": "", "client_secret": "", "user_agent": ""}
+"""
 import praw
+import prawcore
 import tqdm
 import sqlite3
 import json
+from tqdm.contrib.concurrent import process_map  # or thread_map
+
 
 # Connect to the database
 
@@ -34,8 +43,8 @@ c.execute(
    is_reddit_media_domain integer,
    is_robot_indexable integer,
    is_gallery integer,
-   processed boolean,
-   comments_processed boolean
+   processed integer,
+   comments_processed integer
    )"""
 )
 
@@ -75,8 +84,13 @@ with open("secrets.json", "r") as f:
     for row in tqdm.tqdm(c.fetchall()):
         postList.append(row[0])
 
-    for post in tqdm.tqdm(postList):
-        #        tqdm.tqdm.write("Processing post: " + post)
+    def process_post(post):
+        """Download up-to-date post data and comments from Reddit.
+
+        :param post: post ID
+        :returns: None
+
+        """
         try:
             submission = reddit.submission(id=post)
 
@@ -84,7 +98,7 @@ with open("secrets.json", "r") as f:
             # Do some processing on the data to convert praw objects to strings
             # Also convert booleans to integers
             c.execute(
-                "UPDATE posts SET title = ?, author = ?, created_utc = ?, subreddit = ?, score = ?, num_comments = ?, permalink = ?, url = ?, selftext = ?, over_18 = ?, is_video = ?, is_original_content = ?, is_self = ?, is_meta = ?, is_crosspostable = ?, is_reddit_media_domain = ?, is_robot_indexable = ?, is_gallery = ?, processed = true WHERE id = ?",
+                "UPDATE posts SET title = ?, author = ?, created_utc = ?, subreddit = ?, score = ?, num_comments = ?, permalink = ?, url = ?, selftext = ?, over_18 = ?, is_video = ?, is_original_content = ?, is_self = ?, is_meta = ?, is_crosspostable = ?, is_reddit_media_domain = ?, is_robot_indexable = ?, is_gallery = ?, processed = 1 WHERE id = ?",
                 (
                     str(submission.title),
                     str(submission.author),
@@ -111,7 +125,7 @@ with open("secrets.json", "r") as f:
             )
 
             submission.comments.replace_more(limit=None)
-            for comment in submission.comments.list():
+            for comment in tqdm.tqdm(submission.comments.list()):
                 c.execute(
                     "INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (
@@ -125,14 +139,23 @@ with open("secrets.json", "r") as f:
                         comment.created_utc,
                     ),
                 )
-            c.execute(
-                "UPDATE posts SET comments_processed = true WHERE id = ?", (post,)
-            )
+            c.execute("UPDATE posts SET comments_processed = 1 WHERE id = ?", (post,))
 
             # Commit the changes to the database
-            conn.commit()
+            # conn.commit()
+        except prawcore.exceptions.ResponseException:
+            tqdm.tqdm.write(
+                f"Error with post {post} (Post / Comment might be deleted or banned)"
+            )
+            try:
+                c.execute("UPDATE posts SET processed = 0 WHERE id = ?", (post,))
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
         except Exception as e:
-            tqdm.tqdm.write(f"Error with post {post}: " + str(e))
+            tqdm.tqdm.write(f"Error with post {post}: {e}")
+        # Close the connection
 
-# Close the connection
+    process_map(process_post, postList, max_workers=32, chunksize=10)
+conn.commit()
 conn.close()
