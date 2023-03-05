@@ -2,7 +2,7 @@
 
 Run search.py first to get post ids
 Before running the script, make sure to get client id and secret from reddit and add to secrets.json using the following format:
-{"client_id": "", "client_secret": "", "user_agent": ""}
+{"client_id": "", "client_secret": ""}
 """
 import praw
 import prawcore
@@ -66,7 +66,7 @@ with open("secrets.json", "r") as f:
     reddit = praw.Reddit(
         client_id=secrets["client_id"],
         client_secret=secrets["client_secret"],
-        user_agent=secrets["user_agent"],
+        user_agent="BAINSA Reddit Scraper",
     )
 
     postList = []
