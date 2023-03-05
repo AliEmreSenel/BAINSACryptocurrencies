@@ -1,16 +1,20 @@
-import json
+"""Reddit searcher for cryptocurrency posts using the Pushshift API."""
 import pmaw
 import sqlite3
 import tqdm
+import logging
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 reddit = pmaw.PushshiftAPI()
+
+# Start time for the search in unix epoch time
 start_epoch = 1609459200
 
 
-# Open reddit sqlite database
+# Open reddit SQLite database
 conn = sqlite3.connect("reddit.db")
-
-# Create a cursor
 c = conn.cursor()
 
 # Create a table for the posts if it doesn't exist
@@ -40,40 +44,30 @@ c.execute(
    )"""
 )
 
-print("Table created successfully")
-
-count = 0
-
-
-def filter(item):
-    global count
-    count += 1
-    if count % 200 == 0:
-        print(count)
-
-    return True
+log.info("Table created")
 
 
 queries = [
     "crypto",
     "solana",
     "bitcoin",
-    # "etherium",
-    # "ripple",
-    # "dogecoin",
-    # "apecoin",
-    # "btc",
-    # "eth",
-    # "sol",
-    # "xrp",
-    # "doge",
-    # "ape",
+    "etherium",
+    "ripple",
+    "dogecoin",
+    "apecoin",
+    "btc",
+    "eth",
+    "sol",
+    "xrp",
+    "doge",
+    "ape",
 ]
 
 subreddits = []
 
 for query in queries:
-    print(f"Querying {query}")
+    log.info(f"Searching for {query}")
+
     gen = reddit.search_submissions(
         q=query,
         subreddit=subreddits,
@@ -81,12 +75,13 @@ for query in queries:
         since=start_epoch,
         mem_safe=True,
         safe_exit=True,
-        filter_fn=filter,
     )
+
     # Insert post IDs into database if they don't already exist
     # This is to prevent duplicate posts
     # Show progress using tqdm
     for postID in tqdm.tqdm([post["id"] for post in gen]):
         c.execute("INSERT OR IGNORE INTO posts (id) VALUES (?)", (postID,))
         conn.commit()
+
 conn.close()
