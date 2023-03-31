@@ -1,8 +1,8 @@
 """Reddit Post and Comment Data Scraper.
 
-Run pmaw_search.py first to get post ids
+Run search.py first to get post ids
 Before running the script, make sure to get client id and secret from reddit and add to secrets.json using the following format:
-{"client_id": "", "client_secret": "", "user_agent": ""}
+{"client_id": "", "client_secret": ""}
 """
 import praw
 import prawcore
@@ -13,15 +13,10 @@ from tqdm.contrib.concurrent import process_map  # or thread_map
 
 
 # Connect to the database
-
 conn = sqlite3.connect("reddit.db")
 c = conn.cursor()
 
-# Create the tables
-# Note that we are using the IF NOT EXISTS clause to avoid errors if the tables already exist
-# Note that we are using the PRIMARY KEY clause to avoid duplicate entries
-
-# Create a table for the posts if it doesn't exist
+# Create the tables for posts and comments
 c.execute(
     """CREATE TABLE IF NOT EXISTS posts (
    id text NOT NULL PRIMARY KEY ON CONFLICT IGNORE,
@@ -71,7 +66,7 @@ with open("secrets.json", "r") as f:
     reddit = praw.Reddit(
         client_id=secrets["client_id"],
         client_secret=secrets["client_secret"],
-        user_agent=secrets["user_agent"],
+        user_agent="BAINSA Reddit Scraper",
     )
 
     postList = []
@@ -125,20 +120,21 @@ with open("secrets.json", "r") as f:
             )
 
             submission.comments.replace_more(limit=None)
-            for comment in tqdm.tqdm(submission.comments.list()):
-                c.execute(
-                    "INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        comment.id,
-                        comment.parent_id,
-                        comment.link_id,
-                        str(comment.subreddit),
-                        str(comment.author),
-                        comment.body,
-                        comment.score,
-                        comment.created_utc,
-                    ),
-                )
+            if len(submission.comments) > 0:
+                for comment in submission.comments.list():
+                    c.execute(
+                        "INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            comment.id,
+                            comment.parent_id,
+                            comment.link_id,
+                            str(comment.subreddit),
+                            str(comment.author),
+                            comment.body,
+                            comment.score,
+                            comment.created_utc,
+                        ),
+                    )
             c.execute("UPDATE posts SET comments_processed = 1 WHERE id = ?", (post,))
 
             # Commit the changes to the database
@@ -156,6 +152,6 @@ with open("secrets.json", "r") as f:
             tqdm.tqdm.write(f"Error with post {post}: {e}")
         # Close the connection
 
-    process_map(process_post, postList, max_workers=32, chunksize=10)
+    process_map(process_post, postList, max_workers=1, chunksize=1)
 conn.commit()
 conn.close()
