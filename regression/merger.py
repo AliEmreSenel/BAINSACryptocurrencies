@@ -24,7 +24,7 @@ reddit_p = reddit_p.rename(columns={
 # not present columns: other_scores, social
 reddit_p["other_scores"] = ""
 reddit_p["social"] = "reddit"
-reddit_p["date"] = pd.to_datetime(reddit_p["date"])
+reddit_p["date"] = pd.to_datetime(reddit_p["date"], unit='s')
 
 
 # merge inner to be used
@@ -71,7 +71,7 @@ reddit_c = reddit_c.rename(columns={
 })
 
 
-reddit_c["date"] = pd.to_datetime(reddit_c["date"])
+reddit_c["date"] = pd.to_datetime(reddit_c["date"], unit='s')
 
 # not present columns: other_scores, social
 reddit_c["other_scores"] = ""
