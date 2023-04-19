@@ -79,5 +79,6 @@ reddit_c["replies"] = 0
 reddit_c["social"] = "reddit"
 reddit_c["title"] = ""
 # merge inner to be used
-res = pd.concat([twitter, reddit_p, reddit_c], ignore_index=True, join="inner")
+# res = pd.concat([twitter, reddit_p, reddit_c], ignore_index=True, join="inner")
+res = pd.concat([reddit_p, reddit_c], ignore_index=True, join="inner")
 res.to_csv("Aggregated_reddit_twitter.csv")
