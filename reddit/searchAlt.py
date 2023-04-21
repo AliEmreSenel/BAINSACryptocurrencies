@@ -9,6 +9,72 @@ import mysql.connector
 import sys
 from io import BytesIO, SEEK_SET, SEEK_END
 
+
+class ResponseStream(object):
+    """A file-like object that reads from a requests response iterator."""
+
+    def __init__(self, r, i, request_iterator):
+        """Initialize the stream.
+
+        :param r: The requests response object.
+        :param i: The index of the thread.
+        :param request_iterator: The iterator returned by r.iter_content().
+        """
+        self._bytes = BytesIO()
+        self._iterator = request_iterator
+        self.pbar = tqdm.tqdm(
+            total=int(r.headers.get("content-length", 0)),
+            unit="B",
+            unit_scale=True,
+            position=2 + i,
+        )
+
+    def _load_all(self):
+        self._bytes.seek(0, SEEK_END)
+        for chunk in self._iterator:
+            self._bytes.write(chunk)
+
+    def _load_until(self, goal_position):
+        current_position = self._bytes.seek(0, SEEK_END)
+        while current_position < goal_position:
+            try:
+                current_position += self._bytes.write(next(self._iterator))
+                self.pbar.n = current_position
+                self.pbar.refresh()
+            except StopIteration:
+                break
+
+    def tell(self):
+        """Return the current position of the stream."""
+        return self._bytes.tell()
+
+    def read(self, size=None):
+        """Read from the stream.
+
+        :param size: The number of bytes to read. If None, read all bytes.
+        """
+        left_off_at = self._bytes.tell()
+        if size is None:
+            self._load_all()
+        else:
+            goal_position = left_off_at + size
+            self._load_until(goal_position)
+
+        self._bytes.seek(left_off_at)
+        return self._bytes.read(size)
+
+    def seek(self, position, whence=SEEK_SET):
+        """Seek to a position in the stream.
+
+        :param position: The position to seek to.
+        :param whence: The reference point for the position. Defaults to SEEK_SET.
+        """
+        if whence == SEEK_END:
+            self._load_all()
+        else:
+            self._bytes.seek(position, whence)
+
+
 mydb = mysql.connector.connect(
     host="localhost", user="reddit", password="red.dit+bot", database="bainsa"
 )
@@ -129,68 +195,3 @@ process_map(
     position=1,
     leave=False,
 )
-
-
-class ResponseStream(object):
-    """A file-like object that reads from a requests response iterator."""
-
-    def __init__(self, r, i, request_iterator):
-        """Initialize the stream.
-
-        :param r: The requests response object.
-        :param i: The index of the thread.
-        :param request_iterator: The iterator returned by r.iter_content().
-        """
-        self._bytes = BytesIO()
-        self._iterator = request_iterator
-        self.pbar = tqdm.tqdm(
-            total=int(r.headers.get("content-length", 0)),
-            unit="B",
-            unit_scale=True,
-            position=2 + i,
-        )
-
-    def _load_all(self):
-        self._bytes.seek(0, SEEK_END)
-        for chunk in self._iterator:
-            self._bytes.write(chunk)
-
-    def _load_until(self, goal_position):
-        current_position = self._bytes.seek(0, SEEK_END)
-        while current_position < goal_position:
-            try:
-                current_position += self._bytes.write(next(self._iterator))
-                self.pbar.n = current_position
-                self.pbar.refresh()
-            except StopIteration:
-                break
-
-    def tell(self):
-        """Return the current position of the stream."""
-        return self._bytes.tell()
-
-    def read(self, size=None):
-        """Read from the stream.
-
-        :param size: The number of bytes to read. If None, read all bytes.
-        """
-        left_off_at = self._bytes.tell()
-        if size is None:
-            self._load_all()
-        else:
-            goal_position = left_off_at + size
-            self._load_until(goal_position)
-
-        self._bytes.seek(left_off_at)
-        return self._bytes.read(size)
-
-    def seek(self, position, whence=SEEK_SET):
-        """Seek to a position in the stream.
-
-        :param position: The position to seek to.
-        :param whence: The reference point for the position. Defaults to SEEK_SET.
-        """
-        if whence == SEEK_END:
-            self._load_all()
-        else:
-            self._bytes.seek(position, whence)
