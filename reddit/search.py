@@ -5,7 +5,7 @@ import tqdm
 import logging
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 reddit = pmaw.PushshiftAPI()
 
@@ -75,6 +75,7 @@ for query in queries:
         since=start_epoch,
         mem_safe=True,
         safe_exit=True,
+	until=1667503930,
     )
 
     # Insert post IDs into database if they don't already exist

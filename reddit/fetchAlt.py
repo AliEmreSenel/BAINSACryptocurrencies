@@ -8,7 +8,7 @@ import praw
 import prawcore
 import tqdm
 import json
-from tqdm.contrib.concurrent import process_map  # or thread_map
+from tqdm.contrib.concurrent import thread_map
 import mysql.connector
 
 conn = mysql.connector.connect(
@@ -80,85 +80,110 @@ with open("secrets.json", "r") as f:
     for row in tqdm.tqdm(c.fetchall()):
         postList.append(row[0])
 
-    def process_post(post):
+    def process_post(tc, submission):
+        post = submission.id
+        tc.execute(
+            "UPDATE posts SET title = %s, author = %s, created_utc = %s, subreddit = %s, score = %s, num_comments = %s, permalink = %s, url = %s, selftext = %s, over_18 = %s, is_video = %s, is_original_content = %s, is_self = %s, is_meta = %s, is_crosspostable = %s, is_reddit_media_domain = %s, is_robot_indexable = %s, is_gallery = %s, processed = 1 WHERE id = %s",
+            (
+                str(submission.title),
+                str(submission.author),
+                int(submission.created_utc),
+                str(submission.subreddit),
+                int(submission.score),
+                int(submission.num_comments),
+                str(submission.permalink),
+                str(submission.url),
+                str(submission.selftext),
+                int(submission.over_18),
+                int(submission.is_video),
+                int(submission.is_original_content),
+                int(submission.is_self),
+                int(submission.is_meta),
+                int(submission.is_crosspostable),
+                int(submission.is_reddit_media_domain),
+                int(submission.is_robot_indexable),
+                int(submission.is_gallery)
+                if hasattr(submission, "is_gallery")
+                else 0,
+                post,
+            ),
+        )
+
+        submission.comments.replace_more(limit=None)
+        if len(submission.comments) > 0:
+            tc.executemany(
+                "INSERT INTO comments VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                [
+                    (
+                        str(comment.id),
+                        str(comment.parent_id),
+                        str(comment.link_id),
+                        str(comment.subreddit),
+                        str(comment.author),
+                        str(comment.body),
+                        int(comment.score),
+                        int(comment.created_utc),
+                    )
+                    for comment in submission.comments.list()
+                ],
+            )
+        tc.execute(
+            "UPDATE posts SET comments_processed = 1 WHERE id = %s", (post,),
+        )
+
+
+    def process_posts(posts):
         """Download up-to-date post data and comments from Reddit.
 
-        :param post: post ID
+        :param posts: batch of 100 post ids
         :returns: None
 
         """
         tconn = mysql.connector.connect(
             host="localhost", user="reddit", password="red.dit+bot", database="bainsa"
         )
-        tc = tconn.cursor()
+        tc = tconn.cursor(prepared=True)
         try:
-            submission = reddit.submission(id=post)
 
-            # Update the post data
-            # Do some processing on the data to convert praw objects to strings
-            # Also convert booleans to integers
-            tc.execute(
-                "UPDATE posts SET title = %s, author = %s, created_utc = %s, subreddit = %s, score = %s, num_comments = %s, permalink = %s, url = %s, selftext = %s, over_18 = %s, is_video = %s, is_original_content = %s, is_self = %s, is_meta = %s, is_crosspostable = %s, is_reddit_media_domain = %s, is_robot_indexable = %s, is_gallery = %s, processed = 1 WHERE id = %s",
-                (
-                    str(submission.title),
-                    str(submission.author),
-                    int(submission.created_utc),
-                    str(submission.subreddit),
-                    int(submission.score),
-                    int(submission.num_comments),
-                    str(submission.permalink),
-                    str(submission.url),
-                    str(submission.selftext),
-                    int(submission.over_18),
-                    int(submission.is_video),
-                    int(submission.is_original_content),
-                    int(submission.is_self),
-                    int(submission.is_meta),
-                    int(submission.is_crosspostable),
-                    int(submission.is_reddit_media_domain),
-                    int(submission.is_robot_indexable),
-                    int(submission.is_gallery)
-                    if hasattr(submission, "is_gallery")
-                    else 0,
-                    post,
-                ),
-            )
-
-            submission.comments.replace_more(limit=None)
-            if len(submission.comments) > 0:
-                tc.executemany(
-                    "INSERT INTO comments VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                    [
-                        (
-                            comment.id,
-                            comment.parent_id,
-                            comment.link_id,
-                            str(comment.subreddit),
-                            str(comment.author),
-                            comment.body,
-                            comment.score,
-                            comment.created_utc,
-                        )
-                        for comment in submission.comments.list()
-                    ],
-                )
-            tc.execute("UPDATE posts SET comments_processed = 1 WHERE id = %s", (post,))
+            postsData = [p for p in reddit.info(fullnames=["t3_" + p for p in posts])]
+            for submission in postsData:
+                # Update the post data
+                # Do some processing on the data to convert praw objects to strings
+                # Also convert booleans to integers
+                process_post(tc, submission)
+            missing = set(posts) - set([p.id for p in postsData])
+            tc.executemany("UPDATE posts SET processed = 0 WHERE id = %s", [(m,) for m in missing])
+            print(f"Processed {len(postsData)} posts")
             tconn.commit()
             # Commit the changes to the database
             # conn.commit()
-        except prawcore.exceptions.ResponseException:
-            tqdm.tqdm.write(
-                f"Error with post {post} (Post / Comment might be deleted or banned)"
-            )
-            tc.execute("UPDATE posts SET processed = 0 WHERE id = %s", (post,))
-            tconn.commit()
         except Exception as e:
-            tqdm.tqdm.write(f"Error with post {post}: {e}")
+            tqdm.tqdm.write(f"Error with post {posts}: {e}")
+
+            # Rollback the changes
+            tconn.rollback()
+
+            # Fallback to processing posts one by one
+            for post in posts:
+                submission = reddit.submission(id=post)
+                try:
+                    process_post(tc, submission)
+                except prawcore.exceptions.ResponseException:
+                    tqdm.tqdm.write(
+                        f"Error with post {post} (Post / Comment might be deleted or banned)"
+                    )
+                    tc.execute("UPDATE posts SET processed = 0 WHERE id = ?", (post,))
+                except Exception as e:
+                    tqdm.tqdm.write(f"Error with post {post}: {e}")
+            tconn.commit()
+
         tconn.close()
         # Close the connection
 
-    # Process the posts in parallel using 32 threads with tqdm progress bar
-    process_map(process_post, postList, max_workers=32, chunksize=32, position=1)
+    # Split the list into chunks of 100
+    postList = [postList[i : i + 100] for i in range(0, len(postList), 100)]
+
+    thread_map(process_posts, postList, max_workers=8, chunksize=8, position=1)
 
 
 conn.close()

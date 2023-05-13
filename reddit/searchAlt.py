@@ -2,6 +2,7 @@
 import zstandard as zstd
 import json
 import requests
+from requests.adapters import HTTPAdapter
 import logging
 import tqdm
 from tqdm.contrib.concurrent import process_map
@@ -130,12 +131,12 @@ queries = [
     "ape",
 ]
 
-postBar = tqdm.tqdm(position=6, total=2 * 12 * 10**6, unit="posts")
-
-
 year = int(sys.argv[1])
 monthStart = int(sys.argv[2])
 monthEnd = int(sys.argv[3])
+
+# Resume from 460MB
+resumeBytes = 0 * 2**20
 
 
 def processPosts(month):
@@ -144,8 +145,14 @@ def processPosts(month):
         host="localhost", user="reddit", password="red.dit+bot", database="bainsa"
     )
     tc = tconn.cursor()
-    r = requests.get(
-        f"https://files.pushshift.io/reddit/submissions/RS_{year}-{month:02}.zst",
+    postBar = tqdm.tqdm(
+        position=6 + month - monthStart, total=2 * 12 * 10**6, unit="posts"
+    )
+    s = requests.Session()
+    s.mount("http://", HTTPAdapter(max_retries=50))
+    r = s.get(
+        f"http://files.pushshift.io/reddit/submissions/RS_{year}-{month:02}.zst",
+        headers={"Connection": "keep-alive", "Range": f"bytes={resumeBytes}-"},
         stream=True,
     )
     stream = ResponseStream(r, month - monthStart, r.iter_content(2**12))
