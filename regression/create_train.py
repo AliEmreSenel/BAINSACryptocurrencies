@@ -109,9 +109,6 @@ def f(x):
         return 0
 
 
-[0, 0, 1]
-[0, 1, 0]
-[1, 0, 0]
 y_data = list(map(f, y_data))
 
 print(y_data[1:10])
